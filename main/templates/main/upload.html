@@ -1,0 +1,34 @@
+{% extends 'base.html' %}
+{% load staticfiles %}
+
+{% block contents %}
+    {% if images %}
+        <ul>
+            {% for image in images %}
+            <li>
+                <a href="{% url 'draw' image.id %}">
+                    <img src="{{ image.imgfile.url }}"></img>
+                </a>
+                <form action="{% url 'delete' image.id %}" method="post" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <p> {{ form.non_field_errors  }}</p>
+                    <p><input type="submit" value="Delete" /></p>
+                </form>
+            </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        no image uploaded.
+    {% endif %}
+
+    <form action="{% url 'upload' %}" method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <p> {{ form.non_field_errors  }}</p>
+        <p>
+            chart to add:
+            {{ form.imgfile }}
+            <input type="submit" value="Upload" />
+        </p>
+
+    </form>
+{% endblock %}

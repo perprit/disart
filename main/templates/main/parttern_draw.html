@@ -1,0 +1,189 @@
+{% extends 'base.html' %}
+{% load staticfiles %}
+
+{% block head_script %}
+<script src="{% static "js/dollar.js" %}"}></script>
+<script src="{% static "js/d3.min.js" %}"}></script>
+<script>
+    var disart = (function() {
+        // module variables
+        var canvas, ctx, tool, recognizer;
+        var chartimage = new Image();
+
+        var lastDraw = 0;
+        var coord = [];
+        var penStyle = "rgba(255, 0, 0, 0.008)";
+
+        var utilMethod;
+        var sketchState;
+        var domMethod;
+        var eventHandler;
+        var initMethod;
+
+        // utility methods
+        utilMethod = function() {
+            function dic_max(dic, key) {
+                return Math.max.apply(null, dic.map(function(d){return d[key];}));
+            }
+
+            function dic_min(dic, key) {
+                return Math.min.apply(null, dic.map(function(d){return d[key];}));
+            }
+        };
+
+        sketchState = function() {
+            function sketch_start(ev) {
+                ctx.lineWidth=20;
+                ctx.lineJoin=ctx.lineCap = 'round';
+                ctx.strokeStyle=penStyle;
+
+                tool.started = true;
+                ctx.beginPath();
+                ctx.moveTo(ev._x, ev._y);
+            }
+
+            function sketch_ing(ev) {
+                if(tool.started)
+                {
+                    coord.push(new Point(parseInt(ev._x), parseInt(ev._y)));
+
+                    ctx.lineTo(ev._x, ev._y);
+                    ctx.stroke();
+                }
+            }
+
+            function sketch_end(ev) {
+                if(tool.started)
+                {
+                    tool.started = false;                
+                    ctx.closePath();
+                    
+                    lastDraw = new Date().getTime();
+                    setTimeout(function(t) {
+                        if(!tool.started) {
+                            var recogResult = recognizer.Recognize(coord, true);
+
+                            $("#resultbox").append("<div>Type: "+recogResult['Name']+", "+recogResult['Score']+"</div>");
+
+                            ajaxRecog()
+
+                            coord = [];
+                        }
+                    }, 500);
+                }
+            }
+        }
+
+        // DOM manipulating methods
+        domMethod = function() {
+            function clearCanvas() {
+                $("#resultbox").html("");
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(chartimage, 0, 0);
+            }
+        }
+
+
+        // event handler
+        eventHandler = function() {
+            function ev_canvas(ev) {
+                // firefox
+                if (ev.layerX || ev.layerX == 0) {
+                    ev._x = ev.layerX;
+                    ev._y = ev.layerY;
+                }
+                // opera
+                if (ev.offsetX || ev.offsetX == 0) {
+                    ev._x = ev.offsetX;
+                    ev._y = ev.offsetY;
+                }
+                var func = tool[ev.type];
+                if(func) {
+                    func(ev);
+                }
+            }
+        };
+
+        // public method
+        initMethod = function() {
+            if(window.addEventListener) {
+                window.addEventListener('load', InitEvent, false);
+            }
+
+            function InitEvent() {
+                canvas = document.getElementById('drawCanvas');
+                if(!canvas) {
+                    alert("could not find canvas object");
+                    return;
+                }
+                if(!canvas.getContext) {
+                    alert("could not find drawing ctx");
+                    return;
+                }
+                ctx = canvas.getContext('2d');
+                if(!ctx) {
+                    alert("failed to call function 'getContext()");
+                    return;
+                }
+
+                chartimage.src = "{{ image.imgfile.url }}";
+                chartimage.onload = function() {
+                    ctx.drawImage(chartimage, 0, 0);
+                };
+
+                tool = new tool_pencil();
+
+                recognizer = new DollarRecognizer();
+                
+                // web
+                canvas.addEventListener('mousedown', eventHandler.ev_canvas, false);
+                canvas.addEventListener('mousemove', eventHandler.ev_canvas, false);
+                canvas.addEventListener('mouseup', eventHandler.ev_canvas, false);
+
+                // mobile
+                canvas.addEventListener('touchstart', eventHandler.ev_canvas, false);
+                canvas.addEventListener('touchmove', eventHandler.ev_canvas, false);
+                canvas.addEventListener('touchend', eventHandler.ev_canvas, false);
+                canvas.addEventListener('touchcancel', eventHandler.ev_canvas, false);
+            }
+
+            function tool_pencil() {
+                var tool = this;
+                var values_x = [];
+                var values_y = [];
+
+                this.started = false;
+                // mouse
+                this.mousedown = sketchState.sketch_start;
+                this.mousemove = sketchState.sketch_ing;
+                this.mouseup = sketchState.sketch_end;
+
+                // touch
+                this.touchstart = sketchState.sketch_start;
+                this.touchmove = sketchState.sketch_ing;
+                this.touchend = sketchState.sketch_end;
+                this.touchcancel = sketchState.sketch_end;
+            }
+        };
+
+        // initializing script
+
+        initMethod();
+    }());
+
+</script>
+
+{% endblock %}
+
+{% block contents %}
+    {% if image %}
+        <canvas id="drawCanvas"
+            width="{{ image.imgfile.width }}"
+            height="{{ image.imgfile.height }}"
+            style="border: 1px solid">
+        </canvas>
+        <p><input type="submit" value="clear" onclick="domMethod.clearCanvas()" /></p>
+        <div id="resultbox"></div>
+
+    {% endif %}
+{% endblock %}
