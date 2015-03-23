@@ -14,8 +14,7 @@ from main.forms import ImageForm
 
 def draw(request, id=-1):
     image = get_object_or_404(Image, pk=id)
-    result = areaChartRecog(image.imgfile.path);
-
+    #result = areaChartRecog(image.imgfile.path);
     return render(
         request,
         'main/draw.html',
@@ -49,13 +48,16 @@ def delete(request, id=-1):
     return HttpResponseRedirect(reverse('upload'));
 
 def chartrecog(request):
-    image_id = request.POST['image_id']
+    requestData = json.loads(request.body)
+    image_id = requestData['image_id']
     image = get_object_or_404(Image, pk=image_id)
-    result = areaChartRecog(image.imgfile.path);
+    if(requestData['type'] == "null"):  # recognition without sketch info
+        result = areaChartRecog(image.imgfile.path);
+    else:   # recognition with sketch info
+        coord = requestData['coord']
+        result = areaChartRecog(image.imgfile.path, coord);
 
     if request.is_ajax():
-        message = "received AJAX!"
+        return HttpResponse(result);
     else:
-        message = "failed!"
-
-    return HttpResponse(message);
+        return HttpResponse(json.dumps({"error":"recog failed(main.views.chartrecog)"}))

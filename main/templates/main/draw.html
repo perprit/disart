@@ -33,13 +33,18 @@
                 }
             }
         });
+        var sendData = JSON.stringify({image_id : '{{ image.id }}', type: type, coord: footprint});
         $.ajax({
             type: "POST",
-            dataType: "json",
-            data: {image_id : '{{ image.id }}', type: type, coord: footprint},
+            dataType: "json", // expected type of response data
+            data: sendData,
             url: "{% url 'chartrecog' %}",
-        }).done(function() { // TODO
-            console.log("good");
+            success: function(json) {
+                console.log(json);
+            },
+            error: function(e) {
+                console.log("ajax for recogniton error");
+            },
         });
     }
 
@@ -212,7 +217,9 @@
             style="border: 1px solid">
         </canvas>
         <input type="submit" value="clear" onclick="clearCanvas()" />
+        <input type="submit" value="recog without sketch" onclick="chartrecogAjax('null', [])" />
         <div id="resultbox"></div>
+        <div id="plotarea"></div>
 
     {% endif %}
 {% endblock %}

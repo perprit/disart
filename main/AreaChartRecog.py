@@ -95,7 +95,7 @@ def hue_ranges(img):
     spl = [[x[0], x[-1]] for x in spl]
     return spl
 
-def areaChartRecog(path):
+def areaChartRecog(path, coord=[]):
     start_time = time.time()
 
     print("%0.5s sec / recognition start" % (time.time() - start_time))
