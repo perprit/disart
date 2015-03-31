@@ -11,6 +11,7 @@
     var lastDraw = 0;
     var coord = [];
     var penStyle = "rgba(255, 0, 0, 0.01)";
+    var penSize = 30;
     if(window.addEventListener) {
         window.addEventListener('load', InitEvent, false);
     }
@@ -24,8 +25,9 @@
         type: string
         footpring: [Point['X', 'Y'], ...]
     */
-    function chartrecogAjax(type, footprint) {
+    function chartrecogAjax(type, footprint, penSize) {
         var csrftoken = "{{ csrf_token }}";
+        console.log(footprint)
         $.ajaxSetup({
             beforeSend: function(xhr, settings) {
                 if (!csrfSafeMethod(settings.type) && !this.crossDomain) {
@@ -33,7 +35,7 @@
                 }
             }
         });
-        var sendData = JSON.stringify({image_id : '{{ image.id }}', type: type, coord: footprint});
+        var sendData = JSON.stringify({image_id : '{{ image.id }}', hinttype: type, coord: footprint, penSize: penSize});
         $.ajax({
             type: "POST",
             dataType: "json", // expected type of response data
@@ -58,11 +60,12 @@
 
     var sketchState = {
         sketch_start: function(ev) {
-            ctx.lineWidth=20;
+            ctx.lineWidth=penSize;
             ctx.lineJoin=ctx.lineCap = 'round';
             ctx.strokeStyle=penStyle;
 
             tool.started = true;
+            coord.push(new Point(parseInt(ev._x), parseInt(ev._y)));
             ctx.beginPath();
             ctx.moveTo(ev._x, ev._y);
         },
@@ -70,7 +73,11 @@
         sketch_ing: function(ev) {
             if(tool.started)
             {
-                coord.push(new Point(parseInt(ev._x), parseInt(ev._y)));
+                var lp = coord[coord.length-1];
+                if(Math.sqrt(Math.pow(lp['X']-ev._x, 2) + Math.pow(lp['Y']-ev._y, 2)) > 20) {
+                    console.log(ev._x + ", " + ev._y);
+                    coord.push(new Point(parseInt(ev._x), parseInt(ev._y)));
+                }
 
                 ctx.lineTo(ev._x, ev._y);
                 ctx.stroke();
@@ -86,7 +93,9 @@
                 lastDraw = new Date().getTime();
                 setTimeout(function(t) {
                     if(!tool.started) {
-                        var sketchRecogResult = sketchRecognizer.Recognize(coord, true);
+                        var recog_coord = $.extend(true, [], coord);
+                        console.log(recog_coord)
+                        var sketchRecogResult = sketchRecognizer.Recognize(recog_coord, true);
 
                         /*
                         if(sketchRecogResult['Name'] === "Axis") {

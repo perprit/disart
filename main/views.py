@@ -51,13 +51,15 @@ def chartrecog(request):
     requestData = json.loads(request.body)
     image_id = requestData['image_id']
     image = get_object_or_404(Image, pk=image_id)
-    if(requestData['type'] == "null"):  # recognition without sketch info
-        result = areaChartRecog(image.imgfile.path);
+    hinttype = requestData['hinttype']
+    if hinttype == "null":  # recognition without sketch info
+        result = areaChartRecog(image.imgfile.path)
     else:   # recognition with sketch info
         coord = requestData['coord']
-        result = areaChartRecog(image.imgfile.path, coord);
+        penSize = requestData['penSize']
+        result = areaChartRecog(image.imgfile.path, coord, hinttype, penSize)
 
     if request.is_ajax():
-        return HttpResponse(result);
+        return HttpResponse(result)
     else:
         return HttpResponse(json.dumps({"error":"recog failed(main.views.chartrecog)"}))
