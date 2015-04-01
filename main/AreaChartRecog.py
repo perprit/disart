@@ -105,50 +105,45 @@ def areaChartRecog(path, coord=[], hinttype="null", penSize=30):
     gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
     adaptive = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 11, 4)
 
+    graph_range = {'x':[0, width], 'y':[0, height]}
+
     print("%0.5s sec / image manipulation" % (time.time() - start_time))
 
     if len(coord) == 0:
         print("---recognition without sketch---")
         # removing gridline
-        gray_axis_gauss = cv2.GaussianBlur(gray, (13, 13), 0)
-        ret, mask = cv2.threshold(gray_axis_gauss, 210, 255, cv2.THRESH_BINARY_INV)
+        gray_gauss = cv2.GaussianBlur(gray, (13, 13), 0)
+        ret, mask = cv2.threshold(gray_gauss, 210, 255, cv2.THRESH_BINARY_INV)
 
-        masked = adaptive.copy()
-        for i in range(0, len(adaptive)):
-            for j in range(0, len(adaptive[i])):
-                if mask[i][j] != 255:
-                    masked[i][j] = 0    # gridline removed
-
-        masked = np.where(masked != 255, 0, 1)  # 255(white) to 1
+        masked = np.where(np.logical_and(mask == 255, adaptive == 255), 1, 0)
 
         # calculate x-axis histogram to find actual data space
-        x_axis_hist = np.sum(masked, axis=0).astype(int)
-        x_axis_diff = abs(np.roll(x_axis_hist, -1) - x_axis_hist)
-        x_axis_diff[-1] = x_axis_diff[-2]
-        x_axis_gauss = smooth_list_gaussian(x_axis_diff)
+        x_hist = np.sum(masked, axis=0).astype(int)     # axis=0 : x
+        x_diff = abs(np.roll(x_hist, -1) - x_hist)
+        x_diff[-1] = x_diff[-2]
+        x_gauss = smooth_list_gaussian(x_diff)
         # assume that both left and right limit lines remain
-        x_axis_peaks = find_n_peaks(x_axis_gauss, 2)
-        if len(x_axis_peaks) != 2: # TODO
-            print ("WARNING: len(x_axis_peaks) != 2")
+        x_peaks = find_n_peaks(x_gauss, 2)
+        if len(x_peaks) != 2: # TODO
+            print ("WARNING: len(x_peaks) != 2")
 
         # calculate y-axis histogram to find actual data space
-        y_axis_hist = np.sum(masked, axis=1).astype(int)
-        y_axis_diff = abs(np.roll(y_axis_hist, -1) - y_axis_hist)
-        y_axis_diff[-1] = y_axis_diff[-2]
-        y_axis_gauss = smooth_list_gaussian(y_axis_diff)
+        y_hist = np.sum(masked, axis=1).astype(int)     # axis=1 : y
+        y_diff = abs(np.roll(y_hist, -1) - y_hist)
+        y_diff[-1] = y_diff[-2]
+        y_gauss = smooth_list_gaussian(y_diff)
         # assume that only the bottom line survives when masked
-        y_axis_peaks = find_n_peaks(y_axis_gauss, 1)
-        if len(y_axis_peaks) != 1: # TODO
-            print ("WARNING: len(y_axis_peaks) != 1")
+        y_peaks = find_n_peaks(y_gauss, 1)
+        if len(y_peaks) != 1: # TODO
+            print ("WARNING: len(y_peaks) != 1")
 
         print("%0.5s sec / identifying peaks" % (time.time() - start_time))
 
         # extract x-axis ticks data
-        x_ticks_margin = {'x': [15, 40], 'y': [-20,20]}
-                #x_axis_peaks[0]+x_ticks_margin[2]:x_axis_peaks[1]+x_ticks_margin[3]]
+        x_ticks_margin = {'y': [15, 40], 'x': [-20,20]}
         x_ticks_img = gray[
-                np.clip(y_axis_peaks[0]+x_ticks_margin['x'][0], 0, width) : np.clip(y_axis_peaks[0]+x_ticks_margin['x'][1], 0, width),
-                np.clip(x_axis_peaks[0]+x_ticks_margin['y'][0], 0, height) : np.clip(x_axis_peaks[1]+x_ticks_margin['y'][1], 0, height)]
+                np.clip(y_peaks[0]+x_ticks_margin['y'][0], 0, height) : np.clip(y_peaks[0]+x_ticks_margin['y'][1], 0, height),
+                np.clip(x_peaks[0]+x_ticks_margin['x'][0], 0, width) : np.clip(x_peaks[1]+x_ticks_margin['x'][1], 0, width)]
         x_ticks_text = pytesseract.image_to_string(Image.fromarray(x_ticks_img)) # TODO
 
         x_ticks_blur = cv2.GaussianBlur(x_ticks_img, (15,15), 0)
@@ -158,11 +153,11 @@ def areaChartRecog(path, coord=[], hinttype="null", penSize=30):
         x_ticks_peaks = find_otsu_peaks(x_ticks_gauss)
 
         # extract y-axis ticks data
-        y_ticks_margin = {'x': [0, 30], 'y': [-50, 0]}
-                #x_axis_peaks[0]+y_ticks_margin[2]:x_axis_peaks[0]+y_ticks_margin[3]]
+        y_ticks_margin = {'y': [0, 30], 'x': [-50, 0]}
+                #x_peaks[0]+y_ticks_margin[2]:x_peaks[0]+y_ticks_margin[3]]
         y_ticks_img = gray[
-                np.clip(0+y_ticks_margin['x'][0], 0, width) : np.clip(y_axis_peaks[0]+y_ticks_margin['x'][1], 0, width),
-                np.clip(x_axis_peaks[0]+y_ticks_margin['y'][0], 0, height) : np.clip(x_axis_peaks[0]+y_ticks_margin['y'][1], 0, height)]
+                np.clip(0+y_ticks_margin['y'][0], 0, height) : np.clip(y_peaks[0]+y_ticks_margin['y'][1], 0, height),
+                np.clip(x_peaks[0]+y_ticks_margin['x'][0], 0, width) : np.clip(x_peaks[0]+y_ticks_margin['x'][1], 0, width)]
         y_ticks_text = pytesseract.image_to_string(Image.fromarray(y_ticks_img), config='digits')
 
         y_ticks_blur = cv2.GaussianBlur(y_ticks_img, (15,15), 0)
@@ -177,13 +172,15 @@ def areaChartRecog(path, coord=[], hinttype="null", penSize=30):
         print("%0.5s sec / extracting tick labels" % (time.time() - start_time))
 
         # contains actual area data
-        graph = masked[y_ticks_peaks[0]:y_axis_peaks[0], x_axis_peaks[0]:x_axis_peaks[1]]
+        #graph = gray[y_ticks_peaks[0]:y_peaks[0], x_peaks[0]:x_peaks[1]]
+        graph_range['y'] = [y_ticks_peaks[0], y_peaks[0]]
+        graph_range['x'] = [x_peaks[0], x_peaks[1]]
 
     else: # coord & hinttype specified
         print("---recognition with sketch---")
         if hinttype == "Axis":
-            startpoint = coord[0]
-            endpoint = coord[-1]
+            startpoint = coord[0]   # top point of y-axis
+            endpoint = coord[-1]    # right point of x-axis
 
             masked = np.zeros(adaptive.shape, dtype=np.int64)
             for p in coord:
@@ -193,28 +190,32 @@ def areaChartRecog(path, coord=[], hinttype="null", penSize=30):
             masked = np.where(masked != 255, 0, 1)
 
             # calculate x-axis histogram to find actual data space
-            x_axis_hist = np.sum(masked, axis=0).astype(int)
-            x_axis_diff = abs(np.roll(x_axis_hist, -1) - x_axis_hist)
-            x_axis_diff[-1] = x_axis_diff[-2]
-            x_axis_gauss = smooth_list_gaussian(x_axis_diff)
+            x_hist = np.sum(masked, axis=0).astype(int)
+            x_diff = abs(np.roll(x_hist, -1) - x_hist)
+            x_diff[-1] = x_diff[-2]
+            x_gauss = smooth_list_gaussian(x_diff)
             # expecting only the position of x-axis survives
-            x_axis_peaks = find_n_peaks(x_axis_gauss, 1)
+            x_peaks = find_n_peaks(x_gauss, 1)
+            x_peaks.append(endpoint['X'])
 
             # calculate y-axis histogram to find actual data space
-            y_axis_hist = np.sum(masked, axis=1).astype(int)
-            y_axis_diff = abs(np.roll(y_axis_hist, -1) - y_axis_hist)
-            y_axis_diff[-1] = y_axis_diff[-2]
-            y_axis_gauss = smooth_list_gaussian(y_axis_diff)
+            y_hist = np.sum(masked, axis=1).astype(int)
+            y_diff = abs(np.roll(y_hist, -1) - y_hist)
+            y_diff[-1] = y_diff[-2]
+            y_gauss = smooth_list_gaussian(y_diff)
             # expecting only the position of y-axis survives
-            y_axis_peaks = find_n_peaks(y_axis_gauss, 1)
+            y_peaks = find_n_peaks(y_gauss, 1)
+            
+            y_peaks.append(startpoint['Y'])
+            y_peaks.reverse()
 
             print("%0.5s sec / identifying peaks" % (time.time() - start_time))
 
             # extract x-axis ticks data
-            x_ticks_margin = {'x': [15, 40], 'y': [-20,20]}
+            x_ticks_margin = {'y': [15, 40], 'x': [-20,20]}
             x_ticks_img = gray[
-                    np.clip(y_axis_peaks[0]+x_ticks_margin['x'][0], 0, width) : np.clip(y_axis_peaks[0]+x_ticks_margin['x'][1], 0, width),
-                    np.clip(x_axis_peaks[0]+x_ticks_margin['y'][0], 0, height) : np.clip(x_axis_peaks[1]+x_ticks_margin['y'][1], 0, height)]
+                    np.clip(y_peaks[1]+x_ticks_margin['y'][0], 0, height) : np.clip(y_peaks[1]+x_ticks_margin['y'][1], 0, height),
+                    np.clip(x_peaks[0]+x_ticks_margin['x'][0], 0, width) : np.clip(x_peaks[1]+x_ticks_margin['x'][1], 0, width)]
             x_ticks_text = pytesseract.image_to_string(Image.fromarray(x_ticks_img)) # TODO
 
             x_ticks_blur = cv2.GaussianBlur(x_ticks_img, (15,15), 0)
@@ -224,10 +225,10 @@ def areaChartRecog(path, coord=[], hinttype="null", penSize=30):
             x_ticks_peaks = find_otsu_peaks(x_ticks_gauss)
 
             # extract y-axis ticks data
-            y_ticks_margin = {'x': [0, 30], 'y': [-50, 0]}
+            y_ticks_margin = {'y': [-10, 10], 'x': [-50, 0]}
             y_ticks_img = gray[
-                    np.clip(0+y_ticks_margin['x'][0], 0, width) : np.clip(y_axis_peaks[0]+y_ticks_margin['x'][1], 0, width),
-                    np.clip(x_axis_peaks[0]+y_ticks_margin['y'][0], 0, height) : np.clip(x_axis_peaks[0]+y_ticks_margin['y'][1], 0, height)]
+                    np.clip(y_peaks[0]+y_ticks_margin['y'][0], 0, height) : np.clip(y_peaks[1]+y_ticks_margin['y'][1], 0, height),
+                    np.clip(x_peaks[0]+y_ticks_margin['x'][0], 0, width) : np.clip(x_peaks[0]+y_ticks_margin['x'][1], 0, width)]
             y_ticks_text = pytesseract.image_to_string(Image.fromarray(y_ticks_img), config='digits')
 
             y_ticks_blur = cv2.GaussianBlur(y_ticks_img, (15,15), 0)
@@ -242,7 +243,8 @@ def areaChartRecog(path, coord=[], hinttype="null", penSize=30):
             print("%0.5s sec / extracting tick labels" % (time.time() - start_time))
 
             # contains actual area data
-            graph = masked[y_ticks_peaks[0]:y_axis_peaks[0], x_axis_peaks[0]:x_axis_peaks[1]]
+            graph_range['y'] = [y_peaks[0], y_peaks[1]]
+            graph_range['x'] = [x_peaks[0], x_peaks[1]]
 
         elif hinttype == "Legend":
             pass
@@ -250,9 +252,7 @@ def areaChartRecog(path, coord=[], hinttype="null", penSize=30):
             print "unknown hinttype"
             raise Error
 
-        # create hint filter
-        # filter adaptive with hint filter
-
+    # assume graph_range({['x':[x_first, x_end], 'y':[y_first, y_end]})
     hue_list = hue_ranges(img)
     print("%0.5s sec / hue range" % (time.time() - start_time))
     hsv_img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
@@ -263,18 +263,17 @@ def areaChartRecog(path, coord=[], hinttype="null", penSize=30):
 
     for hue_range in hue_list:
         area = cv2.inRange(hsv_img, (hue_range[0]-7, 60, 60), (hue_range[1]+7, 255, 255))
-        hue_area = area[y_ticks_peaks[0]:y_axis_peaks[0], x_axis_peaks[0]:x_axis_peaks[1]]
+        hue_area = area[graph_range['y'][0]:graph_range['y'][1], graph_range['x'][0]:graph_range['x'][1]]
         hue_value = []
 
         for tick in x_ticks_peaks:
-            x = tick + x_ticks_margin['y'][0]
-            #x = tick - 20
+            x = tick + x_ticks_margin['x'][0]
             areaFlag = False
             for y in range(hue_area.shape[0]-1, -1, -1):
                 if not areaFlag and hue_area[y][x] != 0:
                     areaFlag = True
                 elif areaFlag and (hue_area[y][x] == 0 or y == 0):
-                    hue_value.append((y+y_ticks_peaks[0], int(y_max - ((y_max-y_min) * y)/len(hue_area))))
+                    hue_value.append((y+graph_range['y'][0], int(y_max - ((y_max-y_min) * y)/len(hue_area))))
                     break
             if not areaFlag:
                 try:
