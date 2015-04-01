@@ -105,7 +105,7 @@ def areaChartRecog(path, coord=[], hinttype="null", penSize=30):
     gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
     adaptive = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 11, 4)
 
-    graph_range = {'x':[0, width], 'y':[0, height]}
+    plotarea_range = {'x':[0, width], 'y':[0, height]}
 
     print("%0.5s sec / image manipulation" % (time.time() - start_time))
 
@@ -154,7 +154,6 @@ def areaChartRecog(path, coord=[], hinttype="null", penSize=30):
 
         # extract y-axis ticks data
         y_ticks_margin = {'y': [0, 30], 'x': [-50, 0]}
-                #x_peaks[0]+y_ticks_margin[2]:x_peaks[0]+y_ticks_margin[3]]
         y_ticks_img = gray[
                 np.clip(0+y_ticks_margin['y'][0], 0, height) : np.clip(y_peaks[0]+y_ticks_margin['y'][1], 0, height),
                 np.clip(x_peaks[0]+y_ticks_margin['x'][0], 0, width) : np.clip(x_peaks[0]+y_ticks_margin['x'][1], 0, width)]
@@ -168,13 +167,14 @@ def areaChartRecog(path, coord=[], hinttype="null", penSize=30):
 
         x_labels = x_ticks_text.split(' ') # assume that labels in x-axis separated by ' ' # TODO
         y_labels = y_ticks_text.split('\n\n') # assume that labels in y-axis separated by '\n\n' # TODO
+        print x_labels
+        print y_labels
 
         print("%0.5s sec / extracting tick labels" % (time.time() - start_time))
 
         # contains actual area data
-        #graph = gray[y_ticks_peaks[0]:y_peaks[0], x_peaks[0]:x_peaks[1]]
-        graph_range['y'] = [y_ticks_peaks[0], y_peaks[0]]
-        graph_range['x'] = [x_peaks[0], x_peaks[1]]
+        plotarea_range['y'] = [y_ticks_peaks[0], y_peaks[0]]
+        plotarea_range['x'] = [x_peaks[0], x_peaks[1]]
 
     else: # coord & hinttype specified
         print("---recognition with sketch---")
@@ -243,8 +243,8 @@ def areaChartRecog(path, coord=[], hinttype="null", penSize=30):
             print("%0.5s sec / extracting tick labels" % (time.time() - start_time))
 
             # contains actual area data
-            graph_range['y'] = [y_peaks[0], y_peaks[1]]
-            graph_range['x'] = [x_peaks[0], x_peaks[1]]
+            plotarea_range['y'] = [y_peaks[0], y_peaks[1]]
+            plotarea_range['x'] = [x_peaks[0], x_peaks[1]]
 
         elif hinttype == "Legend":
             pass
@@ -252,18 +252,26 @@ def areaChartRecog(path, coord=[], hinttype="null", penSize=30):
             print "unknown hinttype"
             raise Error
 
-    # assume graph_range({['x':[x_first, x_end], 'y':[y_first, y_end]})
+    #result = {}
+    #result['plotarea_range'] = plotarea_range
+    #result_json = json.dumps(result)
+    #print result_json
+
+    print("%0.5s sec / execution end" % (time.time() - start_time))
+    return result_json
+
+    # assume plotarea_range({['x':[x_first, x_end], 'y':[y_first, y_end]})
     hue_list = hue_ranges(img)
     print("%0.5s sec / hue range" % (time.time() - start_time))
     hsv_img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
     y_min = float(y_labels[-1])
     y_max = float(y_labels[0])
-    position = []
+    #position = []
     value = []
 
     for hue_range in hue_list:
         area = cv2.inRange(hsv_img, (hue_range[0]-7, 60, 60), (hue_range[1]+7, 255, 255))
-        hue_area = area[graph_range['y'][0]:graph_range['y'][1], graph_range['x'][0]:graph_range['x'][1]]
+        hue_area = area[plotarea_range['y'][0]:plotarea_range['y'][1], plotarea_range['x'][0]:plotarea_range['x'][1]]
         hue_value = []
 
         for tick in x_ticks_peaks:
@@ -273,7 +281,7 @@ def areaChartRecog(path, coord=[], hinttype="null", penSize=30):
                 if not areaFlag and hue_area[y][x] != 0:
                     areaFlag = True
                 elif areaFlag and (hue_area[y][x] == 0 or y == 0):
-                    hue_value.append((y+graph_range['y'][0], int(y_max - ((y_max-y_min) * y)/len(hue_area))))
+                    hue_value.append((y+plotarea_range['y'][0], int(y_max - ((y_max-y_min) * y)/len(hue_area))))
                     break
             if not areaFlag:
                 try:
@@ -288,7 +296,7 @@ def areaChartRecog(path, coord=[], hinttype="null", penSize=30):
                 except IndexError: # i == len(hue_value)-1
                     hue_value[i] = hue_value[i-1]
 
-        position.append([int(p[0]) for p in hue_value])
+        #position.append([int(p[0]) for p in hue_value])
         value.append([int(p[1]) for p in hue_value])
         
     print("%0.5s sec / extract data from graph area" % (time.time() - start_time))
@@ -299,9 +307,9 @@ def areaChartRecog(path, coord=[], hinttype="null", penSize=30):
 
     result['sample'] = sample
     result['element'] = element
-    result['position'] = position
+    #result['position'] = position
     result['value'] = value
-
+    result['plotarea_range'] = plotarea_range 
     result_json = json.dumps(result)
 
     print result_json
@@ -318,6 +326,6 @@ if __name__ == "__main__":
     if (path is None) or (len(path) == 0):
         print "ERROR: image '%s' not found" % sys.argv[1]
         raise ReferenceError
-    #areaChartRecog(path)
-    coord = [{'Y': 63, 'X': 85}, {'Y': 82, 'X': 92}, {'Y': 102, 'X': 94}, {'Y': 129, 'X': 93}, {'Y': 155, 'X': 93}, {'Y': 179, 'X': 90}, {'Y': 203, 'X': 87}, {'Y': 225, 'X': 84}, {'Y': 249, 'X': 78}, {'Y': 273, 'X': 76}, {'Y': 294, 'X': 76}, {'Y': 317, 'X': 76}, {'Y': 317, 'X': 103}, {'Y': 315, 'X': 123}, {'Y': 313, 'X': 145}, {'Y': 311, 'X': 171}, {'Y': 309, 'X': 200}, {'Y': 308, 'X': 231}, {'Y': 304, 'X': 261}, {'Y': 302, 'X': 288}, {'Y': 302, 'X': 313}, {'Y': 301, 'X': 334}, {'Y': 302, 'X': 360}, {'Y': 301, 'X': 386}, {'Y': 299, 'X': 414}, {'Y': 297, 'X': 436}, {'Y': 297, 'X': 459}, {'Y': 299, 'X': 481}, {'Y': 299, 'X': 507}, {'Y': 300, 'X': 533}, {'Y': 301, 'X': 558}, {'Y': 299, 'X': 583}, {'Y': 298, 'X': 608}, {'Y': 299, 'X': 632}, {'Y': 300, 'X': 653}, {'Y': 300, 'X': 675}, {'Y': 302, 'X': 696}, {'Y': 305, 'X': 717}, {'Y': 306, 'X': 737}]
-    areaChartRecog(path, coord, "Axis", 30);
+    areaChartRecog(path)
+    #coord = [{'Y': 63, 'X': 85}, {'Y': 82, 'X': 92}, {'Y': 102, 'X': 94}, {'Y': 129, 'X': 93}, {'Y': 155, 'X': 93}, {'Y': 179, 'X': 90}, {'Y': 203, 'X': 87}, {'Y': 225, 'X': 84}, {'Y': 249, 'X': 78}, {'Y': 273, 'X': 76}, {'Y': 294, 'X': 76}, {'Y': 317, 'X': 76}, {'Y': 317, 'X': 103}, {'Y': 315, 'X': 123}, {'Y': 313, 'X': 145}, {'Y': 311, 'X': 171}, {'Y': 309, 'X': 200}, {'Y': 308, 'X': 231}, {'Y': 304, 'X': 261}, {'Y': 302, 'X': 288}, {'Y': 302, 'X': 313}, {'Y': 301, 'X': 334}, {'Y': 302, 'X': 360}, {'Y': 301, 'X': 386}, {'Y': 299, 'X': 414}, {'Y': 297, 'X': 436}, {'Y': 297, 'X': 459}, {'Y': 299, 'X': 481}, {'Y': 299, 'X': 507}, {'Y': 300, 'X': 533}, {'Y': 301, 'X': 558}, {'Y': 299, 'X': 583}, {'Y': 298, 'X': 608}, {'Y': 299, 'X': 632}, {'Y': 300, 'X': 653}, {'Y': 300, 'X': 675}, {'Y': 302, 'X': 696}, {'Y': 305, 'X': 717}, {'Y': 306, 'X': 737}]   # axis line example
+    #areaChartRecog(path, coord, "Axis", 30);

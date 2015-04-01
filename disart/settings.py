@@ -67,6 +67,23 @@ DATABASES = {
     }
 }
 
+LOGGING = {
+    'version': 1,
+    'handlers': {
+        'console':{
+            'level': 'DEBUG',
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'loggers': {
+        'django.request': {
+            'handlers':['console'],
+            'propagate': True,
+            'level':'DEBUG',
+        }
+    },
+}
+
 MEDIA_ROOT = os.path.join(BASE_DIR, 'chartimg')
 MEDIA_URL = '/chartimg/'
 

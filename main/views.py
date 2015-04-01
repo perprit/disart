@@ -56,6 +56,7 @@ def chartrecog(request):
         result = areaChartRecog(image.imgfile.path)
     else:   # recognition with sketch info
         coord = requestData['coord']
+        print requestData
         penSize = requestData['penSize']
         result = areaChartRecog(image.imgfile.path, coord, hinttype, penSize)
 
