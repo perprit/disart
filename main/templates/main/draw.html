@@ -11,6 +11,7 @@
     var lastDraw = 0;
     var coord = [];
     var penStyle = "rgba(255, 0, 0, 0.01)";
+    var penSize = 30;
     if(window.addEventListener) {
         window.addEventListener('load', InitEvent, false);
     }
@@ -33,13 +34,32 @@
                 }
             }
         });
+        var sendData = JSON.stringify({image_id : '{{ image.id }}', hinttype: type, coord: footprint, penSize: penSize});
         $.ajax({
             type: "POST",
-            dataType: "json",
-            data: {image_id : '{{ image.id }}', type: type, coord: footprint},
+            dataType: "json", // expected type of response data
+            data: sendData,
             url: "{% url 'chartrecog' %}",
-        }).done(function() { // TODO
-            console.log("good");
+            success: function(json) {
+                var plotarea_range = json['plotarea_range'];
+                ctx.lineWidth=3;
+                ctx.strokeStyle="black";
+
+                ctx.beginPath();
+                ctx.moveTo(plotarea_range['x'][0], plotarea_range['y'][0]);
+                ctx.lineTo(plotarea_range['x'][0], plotarea_range['y'][1]);
+                ctx.stroke();
+                ctx.closePath();
+
+                ctx.beginPath();
+                ctx.moveTo(plotarea_range['x'][0], plotarea_range['y'][1]);
+                ctx.lineTo(plotarea_range['x'][1], plotarea_range['y'][1]);
+                ctx.stroke();
+                ctx.closePath();
+            },
+            error: function(e) {
+                console.log(e);
+            },
         });
     }
 
@@ -53,11 +73,12 @@
 
     var sketchState = {
         sketch_start: function(ev) {
-            ctx.lineWidth=20;
+            ctx.lineWidth=penSize;
             ctx.lineJoin=ctx.lineCap = 'round';
             ctx.strokeStyle=penStyle;
 
             tool.started = true;
+            coord.push(new Point(parseInt(ev._x), parseInt(ev._y)));
             ctx.beginPath();
             ctx.moveTo(ev._x, ev._y);
         },
@@ -65,7 +86,10 @@
         sketch_ing: function(ev) {
             if(tool.started)
             {
-                coord.push(new Point(parseInt(ev._x), parseInt(ev._y)));
+                var lp = coord[coord.length-1];
+                if(Math.sqrt(Math.pow(lp['X']-ev._x, 2) + Math.pow(lp['Y']-ev._y, 2)) > 20) {
+                    coord.push(new Point(parseInt(ev._x), parseInt(ev._y)));
+                }
 
                 ctx.lineTo(ev._x, ev._y);
                 ctx.stroke();
@@ -81,34 +105,8 @@
                 lastDraw = new Date().getTime();
                 setTimeout(function(t) {
                     if(!tool.started) {
-                        var sketchRecogResult = sketchRecognizer.Recognize(coord, true);
-
-                        /*
-                        if(sketchRecogResult['Name'] === "Axis") {
-                            for(var i=0; i<coord.length; i++) {
-                                for(var j=0; j<40; j++) {
-                                    x_hist[parseInt(coord[i]['X'])+j] *= 1.01 - 0.00025*j;
-                                    x_hist[parseInt(coord[i]['X'])-j] *= 1.01 - 0.00025*j;
-                                    y_hist[parseInt(coord[i]['Y'])+j] *= 1.01 - 0.00025*j;
-                                    y_hist[parseInt(coord[i]['Y'])-j] *= 1.01 - 0.00025*j;
-                                }
-                            }
-
-                            ctx.lineWidth=3;
-                            ctx.strokeStyle="black";
-                            ctx.beginPath();
-                            ctx.moveTo(x_hist.indexOf(Math.min.apply(null, x_hist)), dic_min(coord, 'Y'));
-                            ctx.lineTo(x_hist.indexOf(Math.max.apply(null, x_hist)), dic_max(coord, 'Y'));
-                            ctx.stroke();
-                            ctx.closePath();
-
-                            ctx.beginPath();
-                            ctx.moveTo(dic_min(coord, 'X'), y_hist.indexOf(Math.min.apply(null, y_hist)));
-                            ctx.lineTo(dic_max(coord, 'X'), y_hist.indexOf(Math.max.apply(null, y_hist)));
-                            ctx.stroke();
-                            ctx.closePath();
-                        }
-                        */
+                        var recog_coord = $.extend(true, [], coord);
+                        var sketchRecogResult = sketchRecognizer.Recognize(recog_coord, true);
 
                         $("#resultbox").append("<div>Type: "+sketchRecogResult['Name']+", "+sketchRecogResult['Score']+"</div>");
 
@@ -212,7 +210,9 @@
             style="border: 1px solid">
         </canvas>
         <input type="submit" value="clear" onclick="clearCanvas()" />
+        <input type="submit" value="recog without sketch" onclick="chartrecogAjax('null', [])" />
         <div id="resultbox"></div>
+        <div id="plotarea"></div>
 
     {% endif %}
 {% endblock %}
