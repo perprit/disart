@@ -1,3 +1,2 @@
-web prototype for enhancing chart recognition accuracy with simple user sketch
-
-authored by perprit(Jeongin Hwang)
+## Disart
+Enhancing accuracy of chart recognition with simple user sketch.
